@@ -62,11 +62,18 @@ public class ProductController {
      * Relative stock adjustment. PATCH because it modifies a single aspect of the
      * resource. 409 if the resulting stock would be negative.
      */
-    @PatchMapping("/{productId}/stock")
-    public ResponseEntity<ProductResponse> adjustStock(
+    @PatchMapping("/{productId}/increaseStock")
+    public ResponseEntity<ProductResponse> increaseStock(
             @PathVariable String productId,
-            @Valid @RequestBody StockAdjustmentRequest request) {
-        return ResponseEntity.ok(productService.updateStock(productId, request.delta()));
+            @Valid @RequestBody Integer quantity) {
+        return ResponseEntity.ok(productService.increaseStock(productId, quantity));
+    }
+
+    @PatchMapping("/{productId}/decreaseStock")
+    public ResponseEntity<ProductResponse> decreaseStock(
+            @PathVariable String productId,
+            @Valid @RequestBody DecreaseStockRequest request) {
+        return ResponseEntity.ok(productService.decreaseStock(productId, request.quantity()));
     }
 
     /** Soft delete (active = false). 204 No Content; 404 if not found. */

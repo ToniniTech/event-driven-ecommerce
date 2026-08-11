@@ -21,6 +21,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** 400 – bad request. */
+    @ExceptionHandler(InvalidQuantityException.class)
+    public ResponseEntity<ApiError> handleInvalidQuantity(InvalidQuantityException ex, HttpServletRequest req){
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
     /** 404 – business key does not exist. */
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(ProductNotFoundException ex, HttpServletRequest req) {
