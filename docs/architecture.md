@@ -98,7 +98,7 @@ ecommerce-events/
 │
 ├── order-service/              # JWT-protected REST API
 │   ├── domain/                 # Order, OrderItem, OutboxEvent, ProcessedEvent
-│   ├── client/                 # ProductCatalogClient (RestClient to Product Service)
+│   ├── client/                 # ProductInventoryClient (RestClient to Product Service)
 │   ├── messaging/              # OrderEventPublisher, OutboxProcessor, PaymentEventConsumer
 │   ├── service/                # OrderService
 │   └── security/               # JwtService, JwtAuthenticationFilter

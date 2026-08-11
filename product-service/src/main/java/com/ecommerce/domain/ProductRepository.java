@@ -13,7 +13,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /** Look up a product by its business key. */
     Optional<Product> findByProductId(String productId);
 
-    /** Fast existence check used by create (duplicate detection) and CSV upsert. */
+    /** Fast existence check used by product creation duplicate detection. */
     boolean existsByProductId(String productId);
 
     /**

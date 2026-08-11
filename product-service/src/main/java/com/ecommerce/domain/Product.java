@@ -1,5 +1,7 @@
 package com.ecommerce.domain;
 
+import com.ecommerce.exception.InsufficientStockException;
+import com.ecommerce.exception.InvalidQuantityException;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,10 +21,8 @@ import java.math.BigDecimal;
         uniqueConstraints = @UniqueConstraint(name = "uk_products_product_id", columnNames = "product_id")
 )
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+
 public class Product {
 
     /** Internal technical PK. Database-generated; the CSV "id" column is ignored. */
@@ -62,5 +62,88 @@ public class Product {
     @Version
     @Column(nullable = false)
     private Long version;
+
+    public Product(
+            String productId,
+            String name,
+            BigDecimal price,
+            int initialStock
+    ) {
+        this(productId, name, price, initialStock, true);
+    }
+
+    public static Product create(
+            String productId,
+            String name,
+            BigDecimal price,
+            int initialStock,
+            boolean active
+    ) {
+        return new Product(productId, name, price, initialStock, active);
+    }
+
+    private Product(
+            String productId,
+            String name,
+            BigDecimal price,
+            int initialStock,
+            boolean active
+    ) {
+        if (productId == null || productId.isBlank()) {
+            throw new IllegalArgumentException("Product ID is required");
+        }
+        if (productId.length() > 64) {
+            throw new IllegalArgumentException("Product ID must be at most 64 characters");
+        }
+        if (name == null || name.length() < 3 || name.length() > 150) {
+            throw new IllegalArgumentException("Name must be between 3 and 150 characters");
+        }
+        if (price == null || price.signum() <= 0) {
+            throw new IllegalArgumentException("Price must be greater than zero");
+        }
+        if (initialStock < 0) {
+            throw new IllegalArgumentException("Initial stock cannot be negative");
+        }
+
+        this.productId = productId;
+        this.name = name;
+        this.price = price;
+        this.stock = initialStock;
+        this.active = active;
+    }
+
+    public void decreaseStock(int requestedQuantity){
+        if(requestedQuantity<= 0){
+            throw new InvalidQuantityException(requestedQuantity);
+        }
+        if(stock < requestedQuantity){
+            throw new InsufficientStockException(productId, stock, requestedQuantity);
+        }
+
+        this.stock -= requestedQuantity;
+    }
+
+    public void increaseStock(int quantity){
+        if (quantity <= 0){
+            throw new InvalidQuantityException(quantity);
+        }
+        this.stock += quantity;
+    }
+
+    public void updateDetails(String newName, BigDecimal newPrice, boolean active) {
+        if (newName == null || newName.length() < 3 || newName.length() > 150) {
+            throw new IllegalArgumentException("Name must be between 3 and 150 characters");
+        }
+        if (newPrice == null || newPrice.signum() <= 0){
+            throw new IllegalArgumentException("Price must be positive");
+        }
+        this.name = newName;
+        this.price = newPrice;
+        this.active = active;
+    }
+
+    public void deactivate(){
+        this.active = false;
+    }
 
 }

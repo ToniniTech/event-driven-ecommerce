@@ -16,13 +16,14 @@ public class ProductMapper {
 
     /** Build a new entity from a create request. Defaults {@code active} to true when omitted. */
     public Product toEntity(CreateProductRequest createProductRequest) {
-        return Product.builder()
-                .productId(createProductRequest.productId())
-                .name(createProductRequest.name())
-                .price(createProductRequest.price())
-                .stock(createProductRequest.stock())
-                .active(createProductRequest.active())
-                .build();
+        boolean active = createProductRequest.active() == null || createProductRequest.active();
+        return Product.create(
+                createProductRequest.productId(),
+                createProductRequest.name(),
+                createProductRequest.price(),
+                createProductRequest.stock(),
+                active
+        );
     }
 
     /**
@@ -31,9 +32,7 @@ public class ProductMapper {
      * only via the stock endpoint).
      */
     public void applyUpdate(Product product, UpdateProductRequest request) {
-        product.setName(request.name());
-        product.setPrice(request.price());
-        product.setActive(request.active());
+        product.updateDetails(request.name(), request.price(), request.active());
     }
 
     /** Convert an entity into its outbound representation. */

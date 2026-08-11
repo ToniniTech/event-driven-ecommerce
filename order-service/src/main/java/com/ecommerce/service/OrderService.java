@@ -1,7 +1,7 @@
 package com.ecommerce.service;
 
-import com.ecommerce.client.ProductCatalogClient;
-import com.ecommerce.client.ProductInfo;
+import com.ecommerce.client.ProductInventoryClient;
+import com.ecommerce.client.ProductResponse;
 import com.ecommerce.controller.dto.CreateOrderRequest;
 import com.ecommerce.controller.dto.OrderResponse;
 import com.ecommerce.domain.*;
@@ -30,7 +30,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
-    private final ProductCatalogClient productCatalogClient;
+    private final ProductInventoryClient productInventoryClient;
 
     @org.springframework.beans.factory.annotation.Value("${order.currency:CLP}")
     private String defaultCurrency;
@@ -62,6 +62,7 @@ public class OrderService {
                     "Order with idempotency key already exists: " + idempotencyKey);
         }
 
+
         // ── Build order items resolving name + price from catalog ─────────────
         Order order = Order.builder()
                 .customerId(customerId)
@@ -74,8 +75,11 @@ public class OrderService {
                 .map(itemReq -> {
                     // Server resolves name and price from product-service (synchronous REST).
                     // The client only sent productId + quantity; it never sets the price.
-                    ProductInfo product =
-                            productCatalogClient.resolve(itemReq.getProductId());
+                    ProductResponse product =
+                            productInventoryClient.decreaseStock(
+                                    itemReq.getProductId(),
+                                    itemReq.getQuantity()
+                            );
 
                     return OrderItem.builder()
                             .productId(itemReq.getProductId())
