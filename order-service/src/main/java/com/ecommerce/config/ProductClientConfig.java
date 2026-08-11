@@ -3,8 +3,11 @@ package com.ecommerce.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+
+import java.net.http.HttpClient;
+import java.time.Duration;
 
 /**
  * Builds the RestClient used to call product-service.
@@ -17,17 +20,23 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class ProductClientConfig {
 
-    @Bean
-    public RestClient productRestClient(RestClient.Builder builder,  // ← inyectado por Spring, ya instrumentado
-                                       @Value("${product.service.url}") String baseUrl)  {
+    @Bean("productRestClient")
+    public RestClient productRestClient(
+            RestClient.Builder builder,
+            @Value("${product.service.url}") String baseUrl
+    ) {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
 
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(2000); // ms to establish the TCP connection
-        factory.setReadTimeout(3000);    // ms to wait for the response body
+        JdkClientHttpRequestFactory requestFactory =
+                new JdkClientHttpRequestFactory(httpClient);
+
+        requestFactory.setReadTimeout(Duration.ofSeconds(5));
 
         return builder
                 .baseUrl(baseUrl)
-                .requestFactory(factory)
+                .requestFactory(requestFactory)
                 .build();
     }
 }

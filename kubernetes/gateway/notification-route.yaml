@@ -1,0 +1,20 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: notification-route
+  namespace: ecommerce
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: traefik
+      sectionName: web
+
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/notifications
+
+      backendRefs:
+        - name: notification-service
+          port: 8083

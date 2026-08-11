@@ -70,24 +70,28 @@ public class ProductService {
         return productMapper.toResponse(product);
     }
 
-    /**
-     * Apply a relative stock adjustment. The delta may be positive or negative;
-     * the operation is rejected (409) if the resulting stock would be negative,
-     * so stock is never negative, not even transiently.
-     */
+    /** Increase the stock from the database. Fails with 404 NOT_FOUND if the product is no found*/
     @Transactional
-    public ProductResponse updateStock(String productId, int delta){
+    public ProductResponse increaseStock(String productId, int quantity){
         Product product = productRepository.findByProductId(productId)
                 .orElseThrow(()-> new ProductNotFoundException(productId));
 
-        int newStock = product.getStock() + delta;
-        if (newStock < 0) {
-            throw new InsufficientStockException(productId, product.getStock(), delta);
-        }
-        product.setStock(newStock);
+        product.increaseStock(quantity);
 
         log.info("[PRODUCT-SERVICE] Product updated | productId={}", productId);
         return productMapper.toResponse(product);
+
+    }
+    /** Decrease the stock from the database. Fails with 404 NOT_FOUND if the product is no found*/
+    @Transactional
+    public ProductResponse decreaseStock(String productId, int quantity){
+       Product product = productRepository.findByProductId(productId)
+               .orElseThrow(()-> new ProductNotFoundException(productId));
+
+       product.decreaseStock(quantity);
+
+       log.info("[PRODUCT-SERVICE] Product updated | productId={}", productId);
+       return  productMapper.toResponse(product);
 
     }
 
@@ -100,7 +104,7 @@ public class ProductService {
         Product product = productRepository.findByProductId(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
         if (product.isActive()) {
-            product.setActive(false);
+            product.deactivate();
             log.info("[PRODUCT-SERVICE] Product soft-deleted | productId={}", productId);
         }
     }

@@ -8,6 +8,9 @@
 ![JWT](https://img.shields.io/badge/Auth-JWT-000000?style=flat&logo=jsonwebtokens&logoColor=white)
 ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat&logo=springsecurity&logoColor=white)
 ![Zipkin](https://img.shields.io/badge/Tracing-Zipkin-FF6C37?style=flat&logo=jaeger&logoColor=white)
+[![CI](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/maven.yml/badge.svg)](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/maven.yml)
+[![Kubernetes E2E](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/kubernetes-e2e.yml/badge.svg)](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/kubernetes-e2e.yml)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Kind_Local_Deployment-326CE5?style=flat&logo=kubernetes&logoColor=white)
 
 E-commerce microservices system with an event-driven architecture, mostly asynchronous communication over RabbitMQ, a synchronous catalog isolated via REST, stateless JWT authentication, and distributed tracing with OpenTelemetry + Zipkin.
 
@@ -27,19 +30,20 @@ The only synchronous coupling is **deliberate**: Order Service queries Product S
 
 ## Tech stack
 
-| Layer | Technology |
-|------|------------|
-| Language | Java 17 |
-| Framework | Spring Boot 3.2 |
-| Messaging | RabbitMQ 3.12 + Spring AMQP |
+| Layer | Technology                                                   |
+|------|--------------------------------------------------------------|
+| Language | Java 17                                                      |
+| Framework | Spring Boot 3.2                                              |
+| Messaging | RabbitMQ 3.12 + Spring AMQP                                  |
 | Synchronous communication | Spring `RestClient` (Order → Product) with explicit timeouts |
-| Security | Spring Security + JWT (JJWT 0.12) |
-| Persistence | Spring Data JPA + MySQL 8.0 |
-| Observability | Micrometer Tracing + OpenTelemetry + Zipkin |
-| Infrastructure | Docker + Docker Compose |
-| Testing | JUnit 5 + Testcontainers |
-| Build | Maven 3 |
-
+| Security | Spring Security + JWT (JJWT 0.12)                            |
+| Persistence | Spring Data JPA + MySQL 8.0                                  |
+| Observability | Micrometer Tracing + OpenTelemetry + Zipkin                  |
+| Testing | JUnit 5, Testcontainers, Postman + Newman E2E |
+| Build | Maven 3                                                      |
+| Containerization | Docker                                                       |
+| Orchestration | Kubernetes, Kind, Traefik Gateway API |
+| CI | GitHub Actions: service builds + ephemeral Kubernetes E2E |
 ---
 
 ## Architecture
@@ -94,143 +98,20 @@ CLIENT (browser / Postman)
 
 ---
 
-
-## Event flow
-
-| Event | Published by | Consumed by |
-|--------|--------------|---------------|
-| `OrderCreated` | Order Service (via Outbox) | Payment Service, Notification Service |
-| `PaymentProcessed` | Payment Service | Order Service, Notification Service |
-| `PaymentFailed` | Payment Service | Order Service, Notification Service |
-
----
-
-## Design decisions
-
-**Why RabbitMQ and not REST between services?**
-
-Synchronous HTTP communication creates temporal coupling — if Payment Service goes down, Order Service fails too. With RabbitMQ, Order Service publishes the event and continues independently. Messages wait in the queue until Payment Service comes back.
-
-**Why is Product Service synchronous (REST), then?**
-
-Price and availability must be resolved **at the moment** the order is created, not eventually: a "provisional" order without a reliable price cannot exist. That's why Order Service queries Product Service over REST. The coupling is bounded with explicit timeouts (connect 2s / read 3s) so a slow Product Service never exhausts Order Service's thread pool.
-
-**Why a database per service?**
-
-It lets each service evolve, scale, and fail completely independently. The cost is eventual consistency, handled through events and the `processed_events` table for idempotency.
-
-**Why the Outbox pattern?**
-
-Saving the order to MySQL and publishing the event to RabbitMQ are two separate systems: if the second one fails, the event is lost (dual-write problem). With Outbox, the event is persisted in the same transaction as the order, and a poller publishes it afterward. Delivery is guaranteed even if the broker is down at that instant.
-
-**Why stateless JWT and not sessions?**
-
-In microservices, sessions create coupling — every service would need to share the same session store. With JWT, each service validates the token locally using the shared secret. No HTTP calls to Auth Service on every request.
-
----
-
 ## Production patterns implemented
 
-| Pattern | Where | Purpose |
-|--------|-------|-----------|
-| **Database per Service** | 5 MySQL instances | Full autonomy and independence between services |
-| **Outbox Pattern** | Order Service | Event persisted in the same transaction as the order; poller publishes it — solves the dual-write problem |
-| **Saga Choreography** | Order → Payment → Order | Distributed coordination through events, with no central orchestrator |
-| **Idempotency** | Event-driven services | `processed_events` table with `UNIQUE(event_id)` — prevents double processing |
-| **Optimistic Locking** | Product Service | `@Version` on `Product` — detects lost stock updates and fails with 409 instead of overwriting |
-| **Dead Letter Queue** | Every queue | Messages failing after 3 retries → DLQ for manual inspection |
-| **Retry with backoff** | All consumers | 2s → 4s → 10s exponential |
-| **Manual ACK** | All consumers | Message removed from the queue only when processed successfully |
-| **Publisher confirms** | RabbitTemplate | Delivery guarantee to the broker |
-| **Distributed Tracing** | All 5 services | Micrometer + OpenTelemetry + Zipkin — one `traceId` crosses HTTP and AMQP |
-| **Server-side price authority** | Order + Product Service | Price is resolved from the catalog; the client never decides it |
-| **Soft delete** | Product Service | `active = false` — preserves referential integrity with existing orders |
-| **JWT + Refresh Token** | Auth Service | Stateless authentication with token rotation |
-| **BCrypt passwords** | Auth Service | Hash with automatic salt — the password is never stored |
-| **Account Locking** | Auth Service | `failed_attempts` table — automatic lock after 3 failed attempts |
-| **Role-Based Access (RBAC)** | Auth Service | `/api/auth/admin/**` routes restricted to the `ADMIN` role |
+| Pattern | Purpose |
+|---------|---------|
+| **Transactional Outbox** | Prevents inconsistent database and message-broker writes |
+| **Saga Choreography** | Coordinates the purchase flow without a central orchestrator |
+| **Idempotent Consumers** | Prevents duplicated events from being processed twice |
+| **DLQ + Retry** | Handles transient and permanent message-processing failures |
+| **Database per Service** | Keeps services independently owned and deployed |
+| **Optimistic Locking** | Protects product stock from concurrent updates |
+| **Distributed Tracing** | Propagates one trace across HTTP and RabbitMQ |
+| **JWT Security** | Provides stateless authentication and role-based access |
 
----
-
-## Project structure
-
-```
-ecommerce-events/
-├── auth-service/               # JWT: register, login, refresh, admin
-│   ├── domain/                 # User, RefreshToken, Role
-│   ├── security/               # JwtService, JwtAuthenticationFilter
-│   ├── service/                # AuthService, UserDetailsServiceImpl
-│   └── controller/             # AuthController, AuthAdmController + DTOs
-│
-├── order-service/              # JWT-protected REST API
-│   ├── domain/                 # Order, OrderItem, OutboxEvent, ProcessedEvent
-│   ├── client/                 # ProductCatalogClient (RestClient to Product Service)
-│   ├── messaging/              # OrderEventPublisher, OutboxProcessor, PaymentEventConsumer
-│   ├── service/                # OrderService
-│   └── security/               # JwtService, JwtAuthenticationFilter
-│
-├── product-service/            # Synchronous catalog (REST-only), no events
-│   ├── domain/                 # Product (@Version), ProductRepository
-│   ├── mapper/                 # ProductMapper (entity ↔ DTO)
-│   ├── config/                 # CatalogCsvLoader (UPSERT load from CSV at startup)
-│   ├── service/                # ProductService (CRUD, stock, soft delete)
-│   └── controller/             # ProductController + DTOs
-│
-├── payment-service/            # Consumes OrderCreated, simulates gateway
-│   ├── domain/                 # Payment, PaymentStatus, ProcessedEvent
-│   ├── messaging/              # OrderEventConsumer, PaymentEventPublisher
-│   └── service/                # PaymentService, PaymentGatewaySimulator
-│
-├── notification-service/       # Consumes all events, sends emails
-│   ├── domain/                 # Notification, NotificationType, ProcessedEvent
-│   ├── messaging/              # NotificationEventConsumer
-│   └── service/                # NotificationService, EmailTemplateBuilder
-│
-├── infrastructure/
-│   ├── rabbitmq/rabbitmq.conf
-│   └── mysql/                  # Init scripts per database
-│
-├── docker-compose.yml          # Full orchestration (12 containers)
-└── test-flow.sh                # Automated E2E script
-```
-
----
-
-## Deployment (AWS EC2)
-
-The system was deployed and verified on AWS — the whole stack running on a single EC2 instance orchestrated with Docker Compose.
-
-| Item | Value |
-|------|-------|
-| Cloud | AWS EC2 |
-| Instance type | `c7i-flex.large` |
-| OS | Ubuntu 24.04 LTS |
-| Region | South America (São Paulo) — `sa-east-1` |
-| Orchestration | Docker + Docker Compose (12 containers) |
-| Public address | Elastic IP (static across instance restarts) |
-| Access control | Security group — SSH restricted to a single IP, service ports exposed individually |
-| Secrets | `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` injected at runtime via a `.env` file on the server — never committed to the repository |
-
-### What runs on the instance
-
-All 12 containers healthy: 5 Spring Boot microservices, 5 MySQL databases (one per service), RabbitMQ, and Zipkin.
-
-![Docker Compose status on the EC2 instance](./docs/images/docker-compose-ps.png)
-
-### Verified end to end on the deployed instance
-
-The complete purchase flow was executed against the public IP — user registration, order creation, payment processing through RabbitMQ, and the resulting notifications.
-
-![Postman request against the deployed instance](./docs/images/postman-register.png)
-
-Distributed tracing confirmed across services: a single `traceId` propagating from `order-service` through to `product-service` over HTTP.
-
-![Zipkin distributed trace](./docs/images/zipkin-trace.png)
-
-### Notes on this deployment
-
-- **Single-instance by design.** Running everything on one EC2 box with Docker Compose keeps costs predictable and reuses the exact same `docker-compose.yml` that runs locally. A production setup would split the databases out to RDS, run the services on ECS or EKS, and put them behind a load balancer.
-- **The instance is not kept running permanently** to avoid unnecessary cost. The demo video and the screenshots above document a live run; the instance can be brought back up on request.
+[Read all the design decisions](docs/architecture.md#design-decisions).
 
 ---
 
@@ -270,238 +151,51 @@ The fastest way to see the whole system in action. The collection chains the ent
 2. Select the **ecommerce-events-local** environment from the dropdown (top right). *Without this, the variables won't resolve.*
 3. Open the **End-to-End Flow** folder and run it in order:
 
-   | # | Request | What it does |
-      |---|---------|--------------|
-   | 1 | register user | Creates the user and **stores the JWT** automatically |
+   | # | Request | What it does                                                 |
+      |---|---------|--------------------------------------------------------------|
+   | 1 | register user | Creates the user and **stores the JWT** automatically        |
    | 2 | create order | Creates the order and **stores the `orderId`** automatically |
-   | 3 | get order by id | Order status (`PENDING` → `PAID`) |
-   | 4 | get payment by id | Payment result |
-   | 5 | get notification by orderId | Notifications generated from events |
+   | 3 | get order by id | Order status (`PENDING` → `PAID`)                            |
+   | 4 | get payment by id | Payment result                                               |
+   | 5 | get notification by orderId | Notifications generated from events                          |
 
 > **Note on the async flow:** steps 4 and 5 depend on events traveling through RabbitMQ after the order is created. If you query immediately and they aren't there yet, wait 1–2 seconds and retry — that small delay **is** the event-driven nature of the system, not a bug.
 
-Prefer curl? The same flow, step by step, is below.
+Prefer curl? follow the:
+- [Complete local development guide](docs/local-development.md)
+- [Test the complete purchase flow](docs/testing-guide.md)
 
 ---
 
-## How to test the full flow (curl)
+## Kubernetes deployment
 
-### Step 1 — Register a user
+The complete platform runs locally on Kind behind Traefik using Kubernetes
+Gateway API. It includes all five microservices, isolated MySQL databases,
+RabbitMQ, persistent storage, health probes, resource limits and distributed
+tracing.
 
-```bash
-curl -X POST http://localhost:8084/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Juan",
-    "lastName": "Pérez",
-    "email": "juan@example.com",
-    "password": "12345678"
-  }'
-```
+Every pull request can be deployed to an ephemeral Kind cluster and validated
+through Traefik using the complete Newman end-to-end workflow.
 
-Response:
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-  "refreshToken": "550e8400-e29b-41d4-...",
-  "customerId": "cust-a1b2c3d4",
-  "email": "juan@example.com",
-  "role": "CUSTOMER"
-}
-```
+[View the Kubernetes E2E workflow](.github/workflows/kubernetes-e2e.yml).
+---
 
-### Step 2 — Create an order
+## Deployment (AWS EC2)
 
-The `customerId` and `customerEmail` are extracted from the JWT automatically. The client only sends `productId` + `quantity`; the price and name are resolved from Product Service.
+The complete platform was deployed and verified on AWS EC2 using
+Docker Compose.
 
-```bash
-curl -X POST http://localhost:8081/api/orders \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <accessToken>" \
-  -d '{
-    "items": [
-      { "productId": "P0002", "quantity": 1 },
-      { "productId": "P0003", "quantity": 2 }
-    ]
-  }'
-```
-
-> **Idempotency (optional):** to protect against a double-click on the frontend, send an `Idempotency-Key` header. If you repeat the same key, the second request is rejected with `409 Conflict`.
->
-> ```bash
->   -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000"
-> ```
-
-### Step 3 — Check the order status
-
-```bash
-curl http://localhost:8081/api/orders/{orderId} \
-  -H "Authorization: Bearer <accessToken>"
-```
-
-Async status: `PENDING` → `PAYMENT_PROCESSING` → `PAID` or `PAYMENT_FAILED`
-
-### Step 4 — Check the payment
-
-```bash
-curl http://localhost:8082/api/payments/order/{orderId}
-```
-
-### Step 5 — See sent notifications
-
-```bash
-curl http://localhost:8083/api/notifications/order/{orderId}
-```
-
-### Force a failed payment (deterministic)
-
-The simulated gateway rejects the payment when the **total amount** matches one of these business rules:
-
-- **Amount > $1000** → `AMOUNT_EXCEEDS_LIMIT` (you'd need a large quantity, since no product exceeds ~$7).
-- **Amount ending in `.13`** → `CARD_EXPIRED`.
-
-Product `P0001` (*Cebolla 1kg*, $1.13) with `quantity: 1` gives a total of $1.13 and **always** fails with card expired:
-
-```bash
-curl -X POST http://localhost:8081/api/orders \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <accessToken>" \
-  -d '{
-    "items": [{ "productId": "P0001", "quantity": 1 }]
-  }'
-```
-
-In any other case, the gateway approves ~80% of the time (`payment.gateway.success-rate`).
+[View AWS deployment evidence](docs/aws-deployment.md).
 
 ---
 
-## Admin endpoints
+## Documentation
 
-Require a JWT with the `ADMIN` role. The admin user is created automatically when the service starts (see `DataSeeder`).
-
-### Admin credentials (demo)
-
-The admin user is created at startup with these default credentials:
-
-- **Email:** `admin@ecommerce.local`
-- **Password:** `neymarsantos123`
-
-For a real deployment, override them with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables.
-
-### Login as admin
-
-```bash
-curl -X POST http://localhost:8084/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@ecommerce.local",
-    "password": "neymarsantos123"
-  }'
-```
-
-### Lock an account
-
-Deactivates the user and revokes all their refresh tokens. The account is locked after **3 failed login attempts** or manually with this endpoint.
-
-```bash
-curl -X PATCH http://localhost:8084/api/auth/admin/lockUser/{customerId} \
-  -H "Authorization: Bearer <adminAccessToken>"
-```
-
-### Unlock an account
-
-```bash
-curl -X PATCH http://localhost:8084/api/auth/admin/unlockUser/{customerId} \
-  -H "Authorization: Bearer <adminAccessToken>"
-```
-
-Both endpoints return `204 No Content` if the operation succeeds.
-
----
-
-## Product catalog
-
-The catalog is served by **Product Service** (`:8085`) and is loaded from `products_300.csv` at startup via an idempotent import (UPSERT by `productId`): restarting the service does not duplicate rows.
-
-- **300 products** (grocery items), with IDs `P0001` … `P0300`.
-- Prices between **$0.99 and $7.47**.
-- Each product has `stock`, an `active` flag (soft delete), and a `@Version` for optimistic locking.
-
-Real examples from the catalog:
-
-| productId | Name | Price | Stock |
-|-----------|--------|--------|-------|
-| P0001 | Cebolla 1kg | $1.13 | 7 |
-| P0002 | Chocolate 100g | $2.20 | 63 |
-| P0003 | Queso gauda 200g | $3.15 | 189 |
-| P0149 | Leche entera 1L | $2.64 | 10 |
-| P0300 | Carne molida 500g | $6.04 | 91 |
-
-Explore the catalog via API:
-
-```bash
-# Paginated list (?active=true|false optional)
-curl "http://localhost:8085/api/products?page=0&size=10"
-
-# A single product
-curl http://localhost:8085/api/products/P0002
-```
-
----
-
-## Services and ports
-
-| Service | URL |
-|----------|-----|
-| Auth Service | http://localhost:8084 |
-| Order Service | http://localhost:8081 |
-| Payment Service | http://localhost:8082 |
-| Notification Service | http://localhost:8083 |
-| Product Service | http://localhost:8085 |
-| Zipkin (traces) | http://localhost:9411 |
-| RabbitMQ Management UI | http://localhost:15672 — guest/guest |
-| Auth DB | localhost:3310 — authuser/authpass |
-| Order DB | localhost:3307 — orderuser/orderpass |
-| Payment DB | localhost:3308 — paymentuser/paymentpass |
-| Notification DB | localhost:3309 — notifuser/notifpass |
-| Product DB | localhost:3311 — productuser/productpass |
-
----
-
-## Inspect the databases
-
-```sql
--- Auth DB (port 3310)
-SELECT customer_id, email, first_name, role, created_at FROM users;
-
--- Order DB (port 3307)
-SELECT o.order_id, o.customer_id, o.status, o.total_amount, o.created_at,
-       GROUP_CONCAT(i.product_name SEPARATOR ', ') AS products
-FROM orders o
-LEFT JOIN order_items i ON o.id = i.order_id
-GROUP BY o.id ORDER BY o.created_at DESC;
-
--- Payment DB (port 3308)
-SELECT payment_id, order_id, status, amount, failure_reason, created_at
-FROM payments ORDER BY created_at DESC;
-
--- Notification DB (port 3309)
-SELECT notification_type, status, recipient_email, sent_at
-FROM notifications ORDER BY created_at DESC;
-
--- Product DB (port 3311)
-SELECT product_id, name, price, stock, is_active
-FROM products ORDER BY product_id LIMIT 20;
-```
-
----
-
-## Stop the system
-
-```bash
-# Stop containers (keeps data)
-docker-compose down
-
-# Clean start — deletes all data
-docker-compose down -v
-```
+- [Architecture and design decisions](docs/architecture.md)
+- [Local development](docs/local-development.md)
+- [Testing and E2E flow](docs/testing-guide.md)
+- [Authentication and administration](docs/authentication.md)
+- [Product catalog](docs/product-catalog.md)
+- [AWS deployment](docs/aws-deployment.md)
+- [Service CI workflow](.github/workflows/maven.yml)
+- [Kubernetes E2E workflow](.github/workflows/kubernetes-e2e.yml)

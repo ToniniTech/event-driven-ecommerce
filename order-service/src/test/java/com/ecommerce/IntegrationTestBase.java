@@ -1,7 +1,7 @@
 package com.ecommerce;
 
-import com.ecommerce.client.ProductCatalogClient;
-import com.ecommerce.client.ProductInfo;
+import com.ecommerce.client.ProductInventoryClient;
+import com.ecommerce.client.ProductResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -12,6 +12,7 @@ import org.testcontainers.containers.RabbitMQContainer;
 
 import java.math.BigDecimal;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.lenient;
 public abstract class IntegrationTestBase {
 
     @MockBean
-    protected ProductCatalogClient productCatalogClient;
+    protected ProductInventoryClient productInventoryClient;
 
     static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
             .withDatabaseName("order_db_test")
@@ -35,10 +36,10 @@ public abstract class IntegrationTestBase {
     }
 
     @BeforeEach
-    void stubCatalog() {
-        lenient().when(productCatalogClient.resolve(anyString()))
-                .thenAnswer(inv -> new ProductInfo(
-                        inv.getArgument(0), "Teclado Mecanico", new BigDecimal("129.99")));
+    void stubInventory() {
+        lenient().when(productInventoryClient.decreaseStock(anyString(), anyInt()))
+                .thenAnswer(inv -> new ProductResponse(
+                        inv.getArgument(0), "Teclado Mecanico", new BigDecimal("129.99"), 10, true));
     }
 
     @DynamicPropertySource

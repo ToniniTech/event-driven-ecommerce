@@ -1,0 +1,172 @@
+name: Kubernetes E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: kubernetes-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes-e2e:
+    name: Deploy to Kind and run Newman
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ecommerce
+
+      - name: Build service images
+        run: |
+          docker build --tag auth-service:local ./auth-service
+          docker build --tag order-service:local ./order-service
+          docker build --tag notification-service:local ./notification-service
+          docker build --tag payment-service:local ./payment-service
+          docker build --tag product-service:local ./product-service
+
+      - name: Load service images into Kind
+        run: |
+          kind load docker-image auth-service:local --name ecommerce
+          kind load docker-image order-service:local --name ecommerce
+          kind load docker-image notification-service:local --name ecommerce
+          kind load docker-image payment-service:local --name ecommerce
+          kind load docker-image product-service:local --name ecommerce
+
+      - name: Install Gateway API CRDs
+        run: |
+          kubectl apply --server-side \
+            --filename https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
+
+      - name: Install Traefik Gateway controller
+        run: |
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+          helm install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            --set service.spec.type=ClusterIP \
+            --set providers.kubernetesGateway.enabled=true \
+            --set gateway.listeners.web.namespacePolicy.from=All \
+            --wait \
+            --timeout 5m
+
+      - name: Deploy infrastructure
+        run: |
+          kubectl apply --filename kubernetes/namespace.yaml
+          kubectl apply --filename kubernetes/secrets_example.yaml
+          kubectl apply --filename kubernetes/database/
+          kubectl apply --filename kubernetes/rabbitmq/
+          kubectl apply --filename kubernetes/zipkin/
+
+      - name: Wait for infrastructure
+        run: |
+          kubectl rollout status statefulset/auth-db --namespace ecommerce --timeout=5m
+          kubectl rollout status statefulset/order-db --namespace ecommerce --timeout=5m
+          kubectl rollout status statefulset/payment-db --namespace ecommerce --timeout=5m
+          kubectl rollout status statefulset/notification-db --namespace ecommerce --timeout=5m
+          kubectl rollout status statefulset/product-db --namespace ecommerce --timeout=5m
+          kubectl rollout status statefulset/rabbitmq --namespace ecommerce --timeout=5m
+          kubectl rollout status deployment/zipkin --namespace ecommerce --timeout=5m
+
+      - name: Deploy application services
+        run: |
+          kubectl apply --filename kubernetes/auth-service/
+          kubectl apply --filename kubernetes/order-service/
+          kubectl apply --filename kubernetes/notification-service/
+          kubectl apply --filename kubernetes/payment-service/
+          kubectl apply --filename kubernetes/product-service/
+
+      - name: Wait for application services
+        run: |
+          kubectl rollout status deployment/auth-service --namespace ecommerce --timeout=5m
+          kubectl rollout status deployment/order-service --namespace ecommerce --timeout=5m
+          kubectl rollout status deployment/notification-service --namespace ecommerce --timeout=5m
+          kubectl rollout status deployment/payment-service --namespace ecommerce --timeout=5m
+          kubectl rollout status deployment/product-service --namespace ecommerce --timeout=5m
+
+      - name: Deploy Gateway routes
+        run: |
+          kubectl apply --filename kubernetes/gateway/
+          kubectl wait \
+            --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True \
+            httproute --all \
+            --namespace ecommerce \
+            --timeout=2m
+
+      - name: Forward Traefik HTTP port
+        run: |
+          kubectl port-forward service/traefik 8080:80 \
+            --namespace traefik > /tmp/traefik-port-forward.log 2>&1 &
+
+          for attempt in {1..30}; do
+            if curl --silent --show-error --output /dev/null http://127.0.0.1:8080/; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          cat /tmp/traefik-port-forward.log
+          exit 1
+
+      - name: Run Kubernetes E2E workflow
+        run: |
+          npx --yes newman@6.2.1 run \
+            postman/kubernetes-workflow/e2e-kubernetes.postman_collection.json \
+            --environment postman/kubernetes-workflow/kubernetes-enviroment.json \
+            --delay-request 1000 \
+            --reporters cli,junit \
+            --reporter-junit-export newman-results.xml
+
+      - name: Show diagnostics on failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          kubectl get pods --all-namespaces --output wide || true
+          kubectl get gatewayclass,gateway,httproute --all-namespaces || true
+          kubectl get events --all-namespaces --sort-by=.metadata.creationTimestamp || true
+          kubectl logs deployment/traefik --namespace traefik --tail=200 || true
+          kubectl logs --namespace ecommerce \
+            --selector app=auth-service --all-containers --tail=100 --prefix || true
+          kubectl logs --namespace ecommerce \
+            --selector app=order-service --all-containers --tail=100 --prefix || true
+          kubectl logs --namespace ecommerce \
+            --selector app=payment-service --all-containers --tail=100 --prefix || true
+          kubectl logs --namespace ecommerce \
+            --selector app=notification-service --all-containers --tail=100 --prefix || true
+          kubectl logs --namespace ecommerce \
+            --selector app=product-service --all-containers --tail=100 --prefix || true
+
+      - name: Upload Newman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-e2e-newman-report
+          path: newman-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Publish successful E2E summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## ✅ Kubernetes E2E validation passed"
+            echo ""
+            echo "- ✅ Kind cluster created"
+            echo "- ✅ Service images built and loaded"
+            echo "- ✅ Gateway API and Traefik installed"
+            echo "- ✅ Infrastructure and application deployed"
+            echo "- ✅ Gateway routes accepted"
+            echo "- ✅ Newman E2E workflow completed"
+            echo ""
+            echo "**Commit:** \`${GITHUB_SHA::7}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

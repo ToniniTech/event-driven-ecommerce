@@ -51,24 +51,39 @@ spec:
           volumeMounts:
             - name: payment-db-data
               mountPath: /var/lib/mysql
-            - name: init-script
-              mountPath: /docker-entrypoint-initdb.d
+          startupProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - --host=127.0.0.1
+                - --protocol=tcp
+                - --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             exec:
-              command: ["mysqladmin", "ping", "-h", "localhost"]
+              command:
+                - mysqladmin
+                - ping
+                - --host=127.0.0.1
+                - --protocol=tcp
+                - --silent
             initialDelaySeconds: 20
             periodSeconds: 10
             timeoutSeconds: 10
           livenessProbe:
             exec:
-              command: ["mysqladmin", "ping", "-h", "localhost"]
+              command:
+                - mysqladmin
+                - ping
+                - --host=127.0.0.1
+                - --protocol=tcp
+                - --silent
             initialDelaySeconds: 30
             periodSeconds: 15
             timeoutSeconds: 10
-      volumes:
-        - name: init-script
-          configMap:
-            name: payment-db-init
   volumeClaimTemplates:
     - metadata:
         name: payment-db-data

@@ -24,7 +24,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (userRepository.existsByEmail("anthony.viveros@admin.com")){
+        if (userRepository.existsByEmail(adminEmail)){
             return;
         }
 
@@ -38,8 +38,5 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.save(admin);
 
     }
-
-
-
 
 }

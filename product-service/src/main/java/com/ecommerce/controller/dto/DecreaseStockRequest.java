@@ -7,9 +7,10 @@ import jakarta.validation.constraints.NotNull;
  * {@code delta} may be positive (restock) or negative (reserve/sell); the service
  * rejects the request if applying it would drive stock below zero.
  */
-public record StockAdjustmentRequest(
+public record DecreaseStockRequest(
 
-        @NotNull(message = "delta is required")
-        Integer delta
+        @NotNull(message = "quantity is required")
+        Integer quantity
+
 ) {
 }

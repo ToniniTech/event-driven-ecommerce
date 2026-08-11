@@ -1,0 +1,302 @@
+{
+  "info": {
+    "_postman_id": "49dae57c-785d-41ec-a46e-b05397fe38aa",
+    "name": "e2e-kubernetes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49195183",
+    "_collection_link": "https://go.postman.co/collection/49195183-49dae57c-785d-41ec-a46e-b05397fe38aa?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Gateway API End-to-End Flow Copy",
+      "item": [
+        {
+          "name": "1. register user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {",
+                  "    try {",
+                  "        pm.response.to.have.status(201);",
+                  "        console.log(\"PASSED: User registered successfully\");",
+                  "    } catch (error) {",
+                  "        const message = `User registration failed: expected status 201, received ${pm.response.code}. Response: ${pm.response.text().substring(0, 300)}`;",
+                  "        console.error(message);",
+                  "        throw new Error(message);",
+                  "    }",
+                  "});",
+                  "",
+                  "// Extrae el token solo cuando la respuesta es JSON y contiene accessToken",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.accessToken, \"Registration response must include accessToken\").to.exist;",
+                  "    pm.environment.set(\"accessToken\", response.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"firstName\": \"Neymar\",\r\n    \"lastName\": \"Santos\",\r\n    \"email\": \"ramdon-user22@gmail.com\",\r\n    \"password\": \"12345678\"\r\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. create order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order created successfully\", function () {",
+                  "    try {",
+                  "        pm.response.to.have.status(201);",
+                  "        const response = pm.response.json();",
+                  "        pm.expect(response.orderId, \"Creation response must include orderId\").to.exist;",
+                  "        pm.environment.set(\"orderId\", response.orderId);",
+                  "        console.log(`PASSED: Order created successfully (${response.orderId})`);",
+                  "    } catch (error) {",
+                  "        const message = `Order creation failed: expected status 201 with orderId, received ${pm.response.code}. Response: ${pm.response.text().substring(0, 300)}`;",
+                  "        console.error(message);",
+                  "        throw new Error(message);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"items\": [\r\n      { \"productId\": \"P0001\", \"quantity\": 1 },\r\n      { \"productId\": \"P0002\", \"quantity\": 2 }\r\n    ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. get order by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order retrieved successfully\", function () {",
+                  "    try {",
+                  "        pm.response.to.have.status(200);",
+                  "        console.log(`PASSED: Order ${pm.environment.get(\"orderId\")} retrieved successfully`);",
+                  "    } catch (error) {",
+                  "        const message = `Order retrieval failed: expected status 200, received ${pm.response.code}. Response: ${pm.response.text().substring(0, 300)}`;",
+                  "        console.error(message);",
+                  "        throw new Error(message);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{orderId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. get payment by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Payment retrieved successfully\", function () {",
+                  "    try {",
+                  "        pm.response.to.have.status(200);",
+                  "        console.log(`PASSED: Payment for order ${pm.environment.get(\"orderId\")} retrieved successfully`);",
+                  "    } catch (error) {",
+                  "        const message = `Payment retrieval failed: expected status 200, received ${pm.response.code}. Response: ${pm.response.text().substring(0, 300)}`;",
+                  "        console.error(message);",
+                  "        throw new Error(message);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/order/{{orderId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "order",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. get notification by orderId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Notification retrieved successfully\", function () {",
+                  "    try {",
+                  "        pm.response.to.have.status(200);",
+                  "        console.log(`PASSED: Notification for order ${pm.environment.get(\"orderId\")} retrieved successfully`);",
+                  "    } catch (error) {",
+                  "        const message = `Notification retrieval failed: expected status 200, received ${pm.response.code}. Response: ${pm.response.text().substring(0, 300)}`;",
+                  "        console.error(message);",
+                  "        throw new Error(message);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/order/{{orderId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "order",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: auth-route
+  namespace: ecommerce
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: traefik
+      sectionName: web
+
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/auth
+
+      backendRefs:
+        - name: auth-service
+          port: 8084

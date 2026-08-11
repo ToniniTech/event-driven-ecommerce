@@ -1,12 +1,11 @@
 package com.ecommerce.service;
 
-import com.ecommerce.client.ProductCatalogClient;
-import com.ecommerce.client.ProductInfo;
+import com.ecommerce.client.ProductInventoryClient;
+import com.ecommerce.client.ProductResponse;
 import com.ecommerce.controller.dto.CreateOrderRequest;
 import com.ecommerce.controller.dto.OrderResponse;
 import com.ecommerce.domain.*;
 import com.ecommerce.exception.DuplicateOrderException;
-import com.ecommerce.messaging.OrderEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.mockito.Spy;
@@ -39,9 +38,8 @@ import static org.mockito.Mockito.*;
 class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
-    @Mock private OrderEventPublisher eventPublisher;
     @Mock private OutboxEventRepository outboxEventRepository;
-    @Mock private ProductCatalogClient productCatalogClient;
+    @Mock private ProductInventoryClient productInventoryClient;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @InjectMocks private OrderService orderService;
@@ -72,19 +70,18 @@ class OrderServiceTest {
                 ))
                 .build();
 
-//        // Catalog always resolves prod-001 to Teclado Mecánico at $129.99
-
     }
 
     // ── Tests ──────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("should create order, resolve price from catalog and publish OrderCreated event")
+    @DisplayName("should create order, decrease stock and publish OrderCreated event")
     void shouldCreateOrderAndPublishEvent() {
         // Arrange - dado este caso
         when(orderRepository.existsByIdempotencyKey(any())).thenReturn(false);
-        when(productCatalogClient.resolve("prod-001"))
-                .thenReturn(new ProductInfo("prod-001","Teclado Mecánico", new BigDecimal("129.99")));
+        when(productInventoryClient.decreaseStock("prod-001", 2))
+                .thenReturn(new ProductResponse(
+                        "prod-001", "Teclado Mecánico", new BigDecimal("129.99"), 8, true));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(1L);
@@ -94,7 +91,7 @@ class OrderServiceTest {
         // Act — note: customerId is now a separate parameter - cuando hago esto
         OrderResponse response = orderService.createOrder(CUSTOMER_ID, CUSTOMER_EMAIL, IDEM_KEY, validRequest);
 
-        // Assert - espero esto
+        // Assert
         assertThat(response).isNotNull();
         assertThat(response.getCustomerId()).isEqualTo(CUSTOMER_ID);
         // 2 units × $129.99 = $259.98
@@ -103,6 +100,7 @@ class OrderServiceTest {
         verify(outboxEventRepository, times(1)).save(any());
         // Save called twice: once PENDING, once PAYMENT_PROCESSING
         verify(orderRepository, times(2)).save(any(Order.class));
+        verify(productInventoryClient).decreaseStock("prod-001", 2);
     }
 
     @Test
@@ -119,8 +117,9 @@ class OrderServiceTest {
                 .build();
 
         when(orderRepository.existsByIdempotencyKey(any())).thenReturn(false);
-        when(productCatalogClient.resolve("prod-001"))
-                .thenReturn(new ProductInfo("prod-001","Teclado Mecánico", new BigDecimal("129.99")));
+        when(productInventoryClient.decreaseStock("prod-001", 1))
+                .thenReturn(new ProductResponse(
+                        "prod-001", "Teclado Mecánico", new BigDecimal("129.99"), 9, true));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
@@ -137,10 +136,10 @@ class OrderServiceTest {
     @Test
     @DisplayName("should reject duplicate order with same idempotency key")
     void shouldRejectDuplicateIdempotencyKey() {
-        // Arrange - dado este contexto
+        // Arrange
         when(orderRepository.existsByIdempotencyKey("idem-key-001")).thenReturn(true);
 
-        // Act & Assert / cuando hago esto
+        // Act & Assert /
         assertThatThrownBy(() -> orderService.createOrder(CUSTOMER_ID, CUSTOMER_EMAIL, IDEM_KEY, validRequest))
                 .isInstanceOf(DuplicateOrderException.class)
                 .hasMessageContaining("idem-key-001");
@@ -148,7 +147,7 @@ class OrderServiceTest {
         // OrderService no longer publishes directly: it writes to the outbox.
         verify(outboxEventRepository, never()).save(any());
         verify(orderRepository, never()).save(any());
-        verify(productCatalogClient, never()).resolve(any());
+        verify(productInventoryClient, never()).decreaseStock(anyString(), anyInt());
     }
 
         @Test
@@ -210,11 +209,12 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("should resolve product name and price from catalog, not from client")
-    void shouldResolvePriceFromCatalogNotFromClient() {
-        // Arrange — client sends prod-002, catalog returns Mouse at $49.99
-        when(productCatalogClient.resolve("prod-002"))
-                .thenReturn(new ProductInfo("prod-001" , "Mouse Inalámbrico", new BigDecimal("49.99")));
+    @DisplayName("should resolve product name and price from inventory response, not from request")
+    void shouldResolvePriceFromInventoryNotFromRequest() {
+        // Arrange — client sends prod-002, product-service returns Mouse at $49.99
+        when(productInventoryClient.decreaseStock("prod-002", 3))
+                .thenReturn(new ProductResponse(
+                        "prod-002", "Mouse Inalámbrico", new BigDecimal("49.99"), 7, true));
 
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .items(List.of(
@@ -233,11 +233,12 @@ class OrderServiceTest {
         // Act
         orderService.createOrder(CUSTOMER_ID, CUSTOMER_EMAIL, IDEM_KEY, request);
 
-        // Assert — total = 3 × $49.99 = $149.97, name comes from catalog
+        // Assert — total = 3 × $49.99 = $149.97, name comes from product-service
         verify(orderRepository, atLeastOnce()).save(captor.capture());
         Order saved = captor.getAllValues().get(0);
         assertThat(saved.getTotalAmount()).isEqualByComparingTo(new BigDecimal("149.97"));
         assertThat(saved.getItems().get(0).getProductName()).isEqualTo("Mouse Inalámbrico");
         assertThat(saved.getItems().get(0).getUnitPrice()).isEqualByComparingTo(new BigDecimal("49.99"));
+        verify(productInventoryClient).decreaseStock("prod-002", 3);
     }
 }

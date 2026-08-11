@@ -1,6 +1,6 @@
 {
-	"id": "8e74f0a4-529a-4be3-9497-8dd510dbe68f",
-	"name": "New Environment",
+	"id": "463bbdec-dabb-43e9-a923-b4ffa9b1f491",
+	"name": "kubernetes-enviroment",
 	"values": [
 		{
 			"key": "token",
@@ -31,10 +31,16 @@
 			"value": "",
 			"type": "any",
 			"enabled": true
+		},
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"color": null,
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2026-07-17T15:15:41.628Z",
-	"_postman_exported_using": "Postman/12.19.6-260717-0232"
+	"_postman_exported_at": "2026-08-01T14:25:07.560Z",
+	"_postman_exported_using": "Postman/12.21.9-260731-0713"
 }
