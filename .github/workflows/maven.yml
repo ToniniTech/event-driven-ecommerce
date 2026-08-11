@@ -2,12 +2,10 @@ name: CI for ecommerce-events
 
 on:
   push:
-    branches:
-      - main
-      - technical-upgrades
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+      
 
 jobs:
   build-and-test:
