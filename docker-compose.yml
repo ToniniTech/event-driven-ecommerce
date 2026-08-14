@@ -53,6 +53,47 @@ services:
     networks:
       - ecommerce-net
 
+  # ─── Prometheus ──────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      product-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ecommerce-net
+
+  # ─── Grafana ──────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=YourSecurePassword Here
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - ecommerce-net
+
   # ─── MySQL: Auth DB ────────────────────────────────────────────────────────
   auth-db:
     image: mysql:8.0
@@ -344,5 +385,7 @@ volumes:
   payment_db_data:
   notification_db_data:
   product_db_data:
+  prometheus_data:
+  grafana_data:
 
 

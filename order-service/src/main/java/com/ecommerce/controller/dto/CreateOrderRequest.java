@@ -6,13 +6,6 @@ import lombok.*;
 
 import java.util.List;
 
-/**
- * Request body para POST /api/orders
- *
- * Lo que el cliente ENVÍA:
- *   - items          → solo productId + quantity (sin precio)
- */
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -38,8 +38,12 @@ public class SecurityConfig {
                     "/api/auth/register",
                     "/api/auth/login",
                     "/api/auth/refresh",
-                    "/actuator/health"
-                ).permitAll()
+                    "/actuator/health",
+                        "/actuator/prometheus",
+                        "/actuator/metrics"
+
+
+                        ).permitAll()
                 // All other endpoints require a valid JWT
                 .anyRequest().authenticated()
             )
