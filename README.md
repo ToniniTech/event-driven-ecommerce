@@ -11,6 +11,7 @@
 [![CI](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/maven.yml/badge.svg)](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/maven.yml)
 [![Kubernetes E2E](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/kubernetes-e2e.yml/badge.svg)](https://github.com/ToniniTech/Event-Driven-E-commerce/actions/workflows/kubernetes-e2e.yml)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-Kind_Local_Deployment-326CE5?style=flat&logo=kubernetes&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-Dashboard-F46800?style=flat&logo=grafana&logoColor=white)
 
 E-commerce microservices system with an event-driven architecture, mostly asynchronous communication over RabbitMQ, a synchronous catalog isolated via REST, stateless JWT authentication, and distributed tracing with OpenTelemetry + Zipkin.
 
@@ -38,7 +39,7 @@ The only synchronous coupling is **deliberate**: Order Service queries Product S
 | Synchronous communication | Spring `RestClient` (Order → Product) with explicit timeouts |
 | Security | Spring Security + JWT (JJWT 0.12)                            |
 | Persistence | Spring Data JPA + MySQL 8.0                                  |
-| Observability | Micrometer Tracing + OpenTelemetry + Zipkin                  |
+| Observability | Prometheus + Grafana, Micrometer Tracing + OpenTelemetry + Zipkin |
 | Testing | JUnit 5, Testcontainers, Postman + Newman E2E |
 | Build | Maven 3                                                      |
 | Containerization | Docker                                                       |
@@ -133,8 +134,10 @@ docker-compose ps
 # 4. Follow logs in real time
 docker-compose logs -f order-service payment-service notification-service product-service
 
-# 5. Explore the distributed traces
-#    Zipkin UI → http://localhost:9411
+# 5. Explore observability
+#    Grafana dashboard → http://localhost:3000
+#    Prometheus UI     → http://localhost:9090
+#    Zipkin UI         → http://localhost:9411
 ```
 
 ---
