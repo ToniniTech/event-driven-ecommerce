@@ -1,0 +1,261 @@
+{
+  "info": {
+    "_postman_id": "3cab4fee-8c45-4bd6-ad7f-c96992fd542c",
+    "name": "e2e-docker-compose",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49195183",
+    "_collection_link": "https://go.postman.co/collection/49195183-3cab4fee-8c45-4bd6-ad7f-c96992fd542c?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "End-to-End Flow",
+      "item": [
+        {
+          "name": "1. register user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {\r",
+                  "    pm.response.to.have.status(201);\r",
+                  "});\r",
+                  "\r",
+                  "const response = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Access token was returned\", function () {\r",
+                  "    pm.expect(response.accessToken).to.be.a(\"string\").and.not.empty;\r",
+                  "});\r",
+                  "\r",
+                  "pm.environment.set(\"accessToken\", response.accessToken);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const uniqueId = `${Date.now()}-${pm.info.iteration}-${pm.variables.replaceIn(\"{{$randomUUID}}\")}`;\r",
+                  "\r",
+                  "pm.collectionVariables.set(\r",
+                  "    \"testEmail\",\r",
+                  "    `e2e-${uniqueId}@example.com`\r",
+                  ");"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"firstName\": \"E2E\",\r\n  \"lastName\": \"Test\",\r\n  \"email\": \"{{testEmail}}\",\r\n  \"password\": \"12345678\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8084/api/auth/register",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8084",
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. create order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order created successfully\", function () {\r",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+                  "});\r",
+                  "\r",
+                  "const response = pm.response.json();\r",
+                  "\r",
+                  "pm.test(\"Order ID was returned\", function () {\r",
+                  "    pm.expect(response.orderId).to.exist;\r",
+                  "});\r",
+                  "\r",
+                  "pm.environment.set(\"orderId\", response.orderId);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"items\": [\r\n      { \"productId\": \"P0003\", \"quantity\": 1 },\r\n      { \"productId\": \"P0010\", \"quantity\": 2 }\r\n    ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8081/api/orders",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. get order by id",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8081/api/orders/{{orderId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. get payment by id",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8082/api/payments/order/{{orderId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8082",
+              "path": [
+                "api",
+                "payments",
+                "order",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. get notication by orderId",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8083/api/notifications/order/{{orderId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8083",
+              "path": [
+                "api",
+                "notifications",
+                "order",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Postman collection for the Event-Driven E-commerce platform (Spring Boot microservices + RabbitMQ). Walks through the complete purchase flow — register, order creation, payment, and asynchronous notifications — demonstrating how a single request propagates across services via events. Run top to bottom; the access token is set automatically after login."
+    }
+  ],
+  "variable": [
+    {
+      "key": "testEmail",
+      "value": ""
+    }
+  ]
+}
