@@ -119,7 +119,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"items\": [\r\n      { \"productId\": \"P0003\", \"quantity\": 1 },\r\n      { \"productId\": \"P0010\", \"quantity\": 2 }\r\n    ]\r\n}",
+              "raw": "{\r\n    \"items\": [\r\n      { \"productId\": \"P0020\", \"quantity\": 1 },\r\n      { \"productId\": \"P0018\", \"quantity\": 1 }\r\n    ]\r\n}",
               "options": {
                 "raw": {
                   "language": "json"

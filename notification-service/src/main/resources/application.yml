@@ -91,6 +91,11 @@ management:
   health:
     mail:
       enabled: false
+  management:
+    metrics:
+      distribution:
+        percentiles-histogram:
+          http.server.requests: true
 
 
 logging:
