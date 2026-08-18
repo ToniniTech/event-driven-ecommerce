@@ -74,7 +74,11 @@ management:
   endpoint:
     health:
       show-details: always
-
+  management:
+    metrics:
+      distribution:
+        percentiles-histogram:
+          http.server.requests: true
 
 logging:
   level:

@@ -41,6 +41,7 @@ class OrderServiceTest {
     @Mock private OutboxEventRepository outboxEventRepository;
     @Mock private ProductInventoryClient productInventoryClient;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    @Mock private OrderMetrics orderMetrics;
 
     @InjectMocks private OrderService orderService;
 

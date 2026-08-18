@@ -12,6 +12,9 @@ import com.ecommerce.messaging.events.PaymentFailedEvent;
 import com.ecommerce.messaging.events.PaymentProcessedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class OrderService {
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
     private final ProductInventoryClient productInventoryClient;
+    private final OrderMetrics orderMetrics;
 
     @org.springframework.beans.factory.annotation.Value("${order.currency:CLP}")
     private String defaultCurrency;
@@ -105,6 +109,8 @@ public class OrderService {
         log.info("[ORDER-SERVICE] Order persisted | orderId={} | total={} {}",
                 savedOrder.getOrderId(), total, defaultCurrency);
 
+        orderMetrics.orderCreated();
+
         // ── Publish OrderCreated event ────────────────────────────────────────
         OrderCreatedEvent event = buildOrderCreatedEvent(savedOrder);
 
@@ -163,6 +169,8 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found: " + orderId));
         return OrderResponse.from(order);
     }
+
+
 
     private OrderCreatedEvent buildOrderCreatedEvent(Order order) {
 

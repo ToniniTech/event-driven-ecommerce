@@ -38,6 +38,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentGatewaySimulator gatewaySimulator;
     private final PaymentEventPublisher eventPublisher;
+    private final PaymentMetrics paymentMetrics;
 
     @Transactional
     public void processPayment(OrderCreatedEvent event) {
@@ -85,6 +86,8 @@ public class PaymentService {
         payment.markAsCompleted(result.transactionId());
         paymentRepository.save(payment);
 
+        paymentMetrics.paymentSucceeded();
+
         PaymentProcessedEvent processedEvent = PaymentProcessedEvent.builder()
                 .paymentId(payment.getPaymentId())
                 .orderId(payment.getOrderId())
@@ -98,6 +101,7 @@ public class PaymentService {
                 .build();
 
         eventPublisher.publishPaymentProcessed(processedEvent);
+
     }
 
     private void handlePaymentDeclined(Payment payment, OrderCreatedEvent event,
@@ -107,6 +111,8 @@ public class PaymentService {
 
         payment.markAsFailed(result.failureReason(), result.failureCode());
         paymentRepository.save(payment);
+
+        paymentMetrics.paymentFailed();
 
         PaymentFailedEvent failedEvent = PaymentFailedEvent.builder()
                 .paymentId(payment.getPaymentId())

@@ -9,6 +9,7 @@ import com.ecommerce.messaging.events.OrderCreatedEvent;
 import com.ecommerce.messaging.events.PaymentFailedEvent;
 import com.ecommerce.messaging.events.PaymentProcessedEvent;
 import com.ecommerce.service.PaymentGatewaySimulator;
+import com.ecommerce.service.PaymentMetrics;
 import com.ecommerce.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,8 @@ class PaymentServiceTest {
 
     @InjectMocks
     private PaymentService paymentService;
+    @Mock
+    private PaymentMetrics paymentMetrics;
 
     private OrderCreatedEvent orderCreatedEvent;
 
