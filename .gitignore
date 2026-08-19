@@ -4,3 +4,9 @@ out/
 *.iml
 .env
 *.log
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example

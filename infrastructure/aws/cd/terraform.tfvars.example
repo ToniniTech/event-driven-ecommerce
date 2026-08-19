@@ -1,0 +1,16 @@
+aws_region           = "sa-east-1"
+ec2_instance_id      = "i-0123456789abcdef0"
+github_owner         = "ToniniTech"
+github_repository    = "Event-Driven-E-commerce"
+github_branch        = "main"
+
+# Keep true only when token.actions.githubusercontent.com is not already
+# configured as an IAM identity provider in this AWS account.
+create_github_oidc_provider = true
+
+# If the EC2 already has an IAM role, set its role name here. Terraform will
+# attach only the SSM managed policy and the project-scoped ECR pull policy.
+existing_ec2_role_name = ""
+
+# Required only when create_github_oidc_provider is false.
+github_oidc_provider_arn = ""

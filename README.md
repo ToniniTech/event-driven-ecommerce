@@ -44,7 +44,7 @@ The only synchronous coupling is **deliberate**: Order Service queries Product S
 | Build | Maven 3                                                      |
 | Containerization | Docker                                                       |
 | Orchestration | Kubernetes, Kind, Traefik Gateway API |
-| CI | GitHub Actions: service builds + ephemeral Kubernetes E2E |
+| CI/CD | GitHub Actions: service builds, ephemeral Kubernetes E2E, ECR + SSM deployment to EC2 |
 ---
 
 ## Architecture
@@ -190,6 +190,14 @@ Docker Compose.
 
 [View AWS deployment evidence](docs/aws-deployment.md).
 
+The production delivery workflow publishes immutable, commit-addressed images
+to Amazon ECR and updates the EC2 host through AWS Systems Manager. GitHub uses
+OIDC and short-lived credentials; no AWS access key or SSH private key is stored
+in the repository. Health verification automatically rolls a failed release
+back to the last successful image tag.
+
+[Configure and run continuous delivery](docs/continuous-delivery.md).
+
 ---
 
 ## Documentation
@@ -200,5 +208,6 @@ Docker Compose.
 - [Authentication and administration](docs/authentication.md)
 - [Product catalog](docs/product-catalog.md)
 - [AWS deployment](docs/aws-deployment.md)
+- [Continuous delivery to AWS EC2](docs/continuous-delivery.md)
 - [Service CI workflow](.github/workflows/maven.yml)
 - [Kubernetes E2E workflow](.github/workflows/kubernetes-e2e.yml)
