@@ -1,0 +1,49 @@
+name: Deployment configuration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "docker-compose.yml"
+      - "infrastructure/aws/**"
+      - "scripts/deployment/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "docker-compose.yml"
+      - "infrastructure/aws/**"
+      - "scripts/deployment/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate CD configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infrastructure/aws/cd
+
+      - name: Initialize Terraform without a backend
+        working-directory: infrastructure/aws/cd
+        run: terraform init -backend=false -input=false
+
+      - name: Validate Terraform
+        working-directory: infrastructure/aws/cd
+        run: terraform validate
+
+      - name: Validate Docker Compose model
+        run: docker compose config --quiet
+
+      - name: Check deployment shell scripts
+        run: shellcheck scripts/deployment/*.sh
